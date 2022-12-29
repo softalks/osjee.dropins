@@ -34,9 +34,14 @@ public class OsjeeDropins implements Features, SynchronousBundleListener, Servle
 	private BundleContext osgi;
 	String classes;
 
+	protected void set(BundleContext context) {
+		
+	}
+	
 	@Override
 	public final void accept(BundleContext context) {
 		osgi = context;
+		set(context);
 		String classes = osgi.getProperty("com.softalks.osjee.classes");
 		if (classes != null) {
 			context.addBundleListener(this);
