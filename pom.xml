@@ -22,7 +22,7 @@
 		<dependency>
 			<groupId>com.softalks.dsu</groupId>
 			<artifactId>com.softalks.osjee</artifactId>
-			<version>1.0.0-SNAPSHOT</version>
+			<version>1.0.0</version>
 		</dependency>
 	</dependencies>
 </project>
