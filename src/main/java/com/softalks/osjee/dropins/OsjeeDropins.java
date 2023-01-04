@@ -8,6 +8,7 @@ import static org.osgi.framework.wiring.BundleWiring.LISTRESOURCES_RECURSE;
 
 import java.util.Collection;
 import java.util.Dictionary;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,7 @@ import javax.servlet.annotation.WebServlet;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleEvent;
+import org.osgi.framework.ServiceRegistration;
 import org.osgi.framework.SynchronousBundleListener;
 import org.osgi.framework.wiring.BundleWiring;
 
@@ -34,6 +36,8 @@ public class OsjeeDropins implements Features, SynchronousBundleListener, Servle
 	private BundleContext osgi;
 	String classes;
 
+	private Integer ranking = 0;
+	
 	protected void set(BundleContext context) {
 		
 	}
@@ -57,11 +61,14 @@ public class OsjeeDropins implements Features, SynchronousBundleListener, Servle
 		}
 	}
 
-	private void register(Class<?> servlet, String pattern) {
+	private Map<String, ServiceRegistration<Servlet>> servlets = new HashMap<>();
+	
+	private ServiceRegistration<Servlet> register(Class<?> servlet, String pattern) {
 		try {
 			Dictionary<String, Object> properties = new Hashtable<>();
+			properties.put("service.ranking", ++ranking);
 			properties.put("osgi.http.whiteboard.servlet.pattern", pattern);
-			this.osgi.registerService(Servlet.class, (Servlet) servlet.newInstance(), properties);
+			return osgi.registerService(Servlet.class, (Servlet) servlet.newInstance(), properties);
 		} catch (InstantiationException | IllegalAccessException e) {
 			throw new IllegalStateException(e);
 		}
@@ -75,7 +82,8 @@ public class OsjeeDropins implements Features, SynchronousBundleListener, Servle
 	public final void bundleChanged(BundleEvent event) {
 		int type = event.getType();
 		Bundle bundle = event.getBundle();
-		if (!bundle.getLocation().startsWith("file:/")) {
+		String location = bundle.getLocation();
+		if (!location.startsWith("file:/")) {
 			return;
 		}
 		if (type == STARTED) {
@@ -91,7 +99,11 @@ public class OsjeeDropins implements Features, SynchronousBundleListener, Servle
 					Class<?> candidate = loader.loadClass(resource);
 					WebServlet annotation = candidate.getAnnotation(WebServlet.class);
 					if (annotation != null) {
-						register(candidate, annotation.value()[0]);
+						ServiceRegistration<Servlet> registration = register(candidate, annotation.value()[0]);
+						registration = servlets.put(candidate.getName(), registration);
+						if (registration != null) {
+							registration.unregister();
+						}
 					}
 				} catch (ClassNotFoundException e) {
 					throw new IllegalStateException(e);
@@ -106,7 +118,7 @@ public class OsjeeDropins implements Features, SynchronousBundleListener, Servle
 			configuration.put(START, level);
 		}
 		configuration.put(FRAMEWORK_BEGINNING_STARTLEVEL, level);
-		return asList("telnet-console", "web-console", "directory-watcher");
+		return asList("telnet-console", "web-console", "dropins");
 	}
 
 	@Override
